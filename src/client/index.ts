@@ -6,11 +6,13 @@ import {
 	printClientHelp,
 	printQuit,
 } from "../internal/gamelogic/gamelogic.js";
-import { declareAndBind, SimpleQueueType } from "../internal/pubsub/publish.js";
+import { SimpleQueueType } from "../internal/pubsub/publish.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
+import { handlerPause } from "./handlers.js";
+import { subscribeJSON } from "../internal/pubsub/consume.js";
 
 async function main() {
 	const rabbitConnUrl = "amqp://guest:guest@localhost:5672/";
@@ -24,38 +26,49 @@ async function main() {
 
 	const userInput = await clientWelcome();
 
-	await declareAndBind(
+	const gameState: GameState = new GameState(userInput);
+
+	await subscribeJSON(
 		conn,
 		ExchangePerilDirect,
 		`pause.${userInput}`,
 		PauseKey,
 		SimpleQueueType.Transient,
+		handlerPause(gameState),
 	);
-
-	const gameState: GameState = new GameState(userInput);
 
 	while (true) {
 		const words = await getInput();
 		if (words.length === 0) continue;
 		const command = words[0];
 		if (command === "spawn") {
-			console.log("Sending a spawn command");
-			commandSpawn(gameState, words);
+			try {
+				commandSpawn(gameState, words);
+			} catch (err: unknown) {
+				if (err instanceof Error) {
+					console.error(err.message);
+				} else {
+					console.error("Something went wrong:", err);
+				}
+			}
 		} else if (command === "move") {
-			console.log("Sending a move command");
-			const move = commandMove(gameState, words);
-			if (move) console.log("move successful");
+			try {
+				const move = commandMove(gameState, words);
+				if (move) console.log("move successful");
+			} catch (err: unknown) {
+				if (err instanceof Error) {
+					console.error(err.message);
+				} else {
+					console.error("Something went wrong:", err);
+				}
+			}
 		} else if (command === "status") {
-			console.log("Sending a status command");
 			await commandStatus(gameState);
 		} else if (command === "help") {
-			console.log("Sending a help command");
 			printClientHelp();
 		} else if (command === "spam") {
-			console.log("Sending a spam command");
 			console.log("Spamming not allowed yet!");
 		} else if (command === "quit") {
-			console.log("Sending a quit command");
 			printQuit();
 			process.exit(0);
 		} else {
