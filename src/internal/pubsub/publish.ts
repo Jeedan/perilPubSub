@@ -37,3 +37,20 @@ export async function declareAndBind(
 	await channel.bindQueue(queueName, exchange, routingKey);
 	return [channel, queue];
 }
+
+export async function publishJSONToQueue<T>(
+	ch: ConfirmChannel,
+	exchange: string,
+	routingKey: string,
+	value: T,
+) {
+	try {
+		await publishJSON(ch, exchange, routingKey, value);
+	} catch (err: unknown) {
+		if (err instanceof Error) {
+			console.error(err.message);
+		} else {
+			console.error("Something went wrong", err);
+		}
+	}
+}

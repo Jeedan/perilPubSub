@@ -1,6 +1,15 @@
-import amqp, { type ConfirmChannel } from "amqplib";
-import { publishJSON } from "../internal/pubsub/publish.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import amqp from "amqplib";
+import {
+	declareAndBind,
+	publishJSONToQueue,
+	SimpleQueueType,
+} from "../internal/pubsub/publish.js";
+import {
+	ExchangePerilDirect,
+	ExchangePerilTopic,
+	GameLogSlug,
+	PauseKey,
+} from "../internal/routing/routing.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
 
 async function main() {
@@ -15,6 +24,15 @@ async function main() {
 
 	const channel = await conn.createConfirmChannel();
 
+	// Durable queues survive a server restart
+	await declareAndBind(
+		conn,
+		ExchangePerilTopic,
+		GameLogSlug,
+		`${GameLogSlug}.*`,
+		SimpleQueueType.Durable,
+	);
+
 	printServerHelp();
 	while (true) {
 		const input = await getInput();
@@ -22,17 +40,18 @@ async function main() {
 		const command = input[0];
 		if (command === "pause") {
 			console.log("Sending a pause message");
-			await sendMessageToQueue(channel, ExchangePerilDirect, PauseKey, {
+			await publishJSONToQueue(channel, ExchangePerilDirect, PauseKey, {
 				isPaused: true,
 			});
 		} else if (command === "resume") {
 			console.log("Sending a resume message");
-			await sendMessageToQueue(channel, ExchangePerilDirect, PauseKey, {
+			await publishJSONToQueue(channel, ExchangePerilDirect, PauseKey, {
 				isPaused: false,
 			});
 		} else if (command === "quit") {
 			console.log("exiting");
-			break;
+			process.exit(0);
+			//break;
 		} else {
 			console.log("Invalid command");
 		}
@@ -43,20 +62,3 @@ main().catch((err) => {
 	console.error("Fatal error:", err);
 	process.exit(1);
 });
-
-async function sendMessageToQueue<T>(
-	ch: ConfirmChannel,
-	exchange: string,
-	routingKey: string,
-	value: T,
-) {
-	try {
-		await publishJSON(ch, exchange, routingKey, value);
-	} catch (err: unknown) {
-		if (err instanceof Error) {
-			console.error(err.message);
-		} else {
-			console.error("Something went wrong", err);
-		}
-	}
-}
