@@ -6,10 +6,7 @@ import {
 	printClientHelp,
 	printQuit,
 } from "../internal/gamelogic/gamelogic.js";
-import {
-	publishJSONToQueue,
-	SimpleQueueType,
-} from "../internal/pubsub/publish.js";
+import { publishJSONToQueue } from "../internal/pubsub/publish.js";
 import {
 	ArmyMovesPrefix,
 	ExchangePerilDirect,
@@ -20,7 +17,7 @@ import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { handlerMove, handlerPause } from "./handlers.js";
-import { subscribeJSON } from "../internal/pubsub/consume.js";
+import { SimpleQueueType, subscribeJSON } from "../internal/pubsub/consume.js";
 
 async function main() {
 	const rabbitConnUrl = "amqp://guest:guest@localhost:5672/";

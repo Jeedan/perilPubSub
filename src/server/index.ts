@@ -1,9 +1,5 @@
 import amqp from "amqplib";
-import {
-	declareAndBind,
-	publishJSONToQueue,
-	SimpleQueueType,
-} from "../internal/pubsub/publish.js";
+import { publishJSONToQueue } from "../internal/pubsub/publish.js";
 import {
 	ExchangePerilDirect,
 	ExchangePerilTopic,
@@ -11,6 +7,7 @@ import {
 	PauseKey,
 } from "../internal/routing/routing.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
+import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
 
 async function main() {
 	const rabbitConnUrl = "amqp://guest:guest@localhost:5672/";
