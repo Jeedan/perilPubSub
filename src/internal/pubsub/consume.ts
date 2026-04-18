@@ -1,4 +1,5 @@
 import amqp from "amqplib";
+import { ExchangeDeadLetterX } from "../routing/routing.js";
 
 export enum AckType {
 	Ack,
@@ -62,6 +63,9 @@ export async function declareAndBind(
 		durable: isDurable,
 		autoDelete: isTransient,
 		exclusive: isTransient,
+		arguments: {
+			"x-dead-letter-exchange": ExchangeDeadLetterX,
+		},
 	});
 	await channel.bindQueue(queueName, exchange, routingKey);
 	return [channel, queue];
