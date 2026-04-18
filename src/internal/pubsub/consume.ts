@@ -13,7 +13,7 @@ export async function subscribeJSON<T>(
 	queueName: string,
 	key: string,
 	queueType: SimpleQueueType,
-	handler: (data: T) => AckType,
+	handler: (data: T) => Promise<AckType> | AckType,
 ): Promise<void> {
 	const [channel, queue] = await declareAndBind(
 		conn,
@@ -25,10 +25,10 @@ export async function subscribeJSON<T>(
 
 	await channel.consume(
 		queue.queue,
-		(message: amqp.ConsumeMessage | null) => {
+		async (message: amqp.ConsumeMessage | null) => {
 			if (!message) return;
 			const msgContent = JSON.parse(message.content.toString());
-			const ackType = handler(msgContent);
+			const ackType = await handler(msgContent);
 			if (ackType === AckType.Ack) {
 				channel.ack(message);
 				console.log("ack type occured");
