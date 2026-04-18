@@ -1,5 +1,5 @@
 import amqp from "amqplib";
-import { declareAndBind, type SimpleQueueType } from "./publish.js";
+import { declareAndBind, SimpleQueueType } from "./publish.js";
 
 export async function subscribeJSON<T>(
 	conn: amqp.ChannelModel,
