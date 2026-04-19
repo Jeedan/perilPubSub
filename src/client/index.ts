@@ -1,4 +1,4 @@
-import amqp from "amqplib";
+import amqp, { type Channel, type ConfirmChannel } from "amqplib";
 import {
 	clientWelcome,
 	commandStatus,
@@ -6,11 +6,15 @@ import {
 	printClientHelp,
 	printQuit,
 } from "../internal/gamelogic/gamelogic.js";
-import { publishJSONToQueue } from "../internal/pubsub/publish.js";
+import {
+	publishJSONToQueue,
+	publishMsgPack,
+} from "../internal/pubsub/publish.js";
 import {
 	ArmyMovesPrefix,
 	ExchangePerilDirect,
 	ExchangePerilTopic,
+	GameLogSlug,
 	PauseKey,
 	WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
@@ -19,6 +23,7 @@ import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
 import { SimpleQueueType, subscribeJSON } from "../internal/pubsub/consume.js";
+import type { GameLog } from "../internal/gamelogic/logs.js";
 
 async function main() {
 	const rabbitConnUrl = "amqp://guest:guest@localhost:5672/";
@@ -60,7 +65,7 @@ async function main() {
 		WarRecognitionsPrefix,
 		`${WarRecognitionsPrefix}.*`,
 		SimpleQueueType.Durable,
-		handlerWar(gameState),
+		handlerWar(gameState, publishCH),
 	);
 
 	while (true) {
@@ -88,7 +93,6 @@ async function main() {
 					`${ArmyMovesPrefix}.${userName}`,
 					move,
 				);
-				console.log("Successfully published a move command");
 			} catch (err: unknown) {
 				if (err instanceof Error) {
 					console.error(err.message);
@@ -116,3 +120,22 @@ main().catch((err) => {
 	console.error("Fatal error:", err);
 	process.exit(1);
 });
+
+export async function publishGameLog(
+	channel: ConfirmChannel,
+	username: string,
+	message: string,
+) {
+	const gameLog: GameLog = {
+		currentTime: new Date(),
+		username,
+		message,
+	};
+
+	await publishMsgPack(
+		channel,
+		ExchangePerilTopic,
+		`${GameLogSlug}.${gameLog.username}`,
+		gameLog,
+	);
+}

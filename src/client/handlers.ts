@@ -16,6 +16,7 @@ import {
 	ExchangePerilTopic,
 	WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
+import { publishGameLog } from "./index.js";
 
 export function handlerPause(gs: GameState): (pause: PlayingState) => AckType {
 	return (ps) => {
@@ -68,30 +69,54 @@ export function handlerMove(
 	};
 }
 
-export function handlerWar(gs: GameState): (war: RecognitionOfWar) => AckType {
-	return (war) => {
+export function handlerWar(
+	gs: GameState,
+	channel: ConfirmChannel,
+): (war: RecognitionOfWar) => Promise<AckType> {
+	return async (war) => {
 		const warResolution = handleWar(gs, war);
-		process.stdout.write("> ");
 		const warOutcome = warResolution.result;
-		switch (warOutcome) {
-			case WarOutcome.NotInvolved:
-				return AckType.NackRequeue;
+		try {
+			switch (warOutcome) {
+				case WarOutcome.NotInvolved:
+					return AckType.NackRequeue;
 
-			case WarOutcome.NoUnits:
-				return AckType.NackDiscard;
+				case WarOutcome.NoUnits:
+					return AckType.NackDiscard;
 
-			case WarOutcome.OpponentWon:
-				return AckType.Ack;
+				case WarOutcome.OpponentWon:
 
-			case WarOutcome.YouWon:
-				return AckType.Ack;
+				case WarOutcome.YouWon:
+					await publishGameLog(
+						channel,
+						gs.getUsername(),
+						`${warResolution.winner} won a war against ${warResolution.loser}`,
+					);
+					return AckType.Ack;
+				case WarOutcome.Draw:
+					await publishGameLog(
+						channel,
+						gs.getUsername(),
+						`A war between ${warResolution.attacker} and ${warResolution.defender} resulted in a draw`,
+					);
+					return AckType.Ack;
 
-			case WarOutcome.Draw:
-				return AckType.Ack;
-
-			default:
-				console.log("Something went wrong, invalid war outcome");
-				return AckType.NackDiscard;
+				default:
+					console.log("Something went wrong, invalid war outcome");
+					return AckType.NackDiscard;
+			}
+		} catch (err: unknown) {
+			if (err instanceof Error) {
+				console.error(
+					"Something went wrong, Requeing message.",
+					err.message,
+				);
+			} else {
+				console.error("Something went wrong, Requeing message.", err);
+			}
+			return AckType.NackRequeue;
+		} finally {
+			process.stdout.write("> ");
 		}
 	};
 }

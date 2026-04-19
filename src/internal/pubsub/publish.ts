@@ -1,6 +1,7 @@
 import type { ConfirmChannel } from "amqplib";
+import { encode } from "@msgpack/msgpack";
 
-export async function publishJSON<T>(
+async function publishJSON<T>(
 	ch: ConfirmChannel,
 	exchange: string,
 	routingKey: string,
@@ -27,4 +28,22 @@ export async function publishJSONToQueue<T>(
 			console.error("Something went wrong", err);
 		}
 	}
+}
+
+export async function publishMsgPack<T>(
+	ch: ConfirmChannel,
+	exchange: string,
+	routingKey: string,
+	value: T,
+): Promise<void> {
+	const encodedMsgPack = encode(value);
+
+	const contentBuffer: Buffer = Buffer.from(
+		encodedMsgPack.buffer,
+		encodedMsgPack.byteOffset,
+		encodedMsgPack.byteLength,
+	);
+	ch.publish(exchange, routingKey, contentBuffer, {
+		contentType: "application/x-msgpack",
+	});
 }

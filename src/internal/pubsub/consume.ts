@@ -1,5 +1,6 @@
 import amqp from "amqplib";
 import { ExchangeDeadLetterX } from "../routing/routing.js";
+import { decode } from "@msgpack/msgpack";
 
 export enum AckType {
 	Ack,
@@ -31,12 +32,42 @@ export async function subscribeJSON<T>(
 			const ackType = await handler(msgContent);
 			if (ackType === AckType.Ack) {
 				channel.ack(message);
-				console.log("ack type occured");
 			} else if (ackType === AckType.NackRequeue) {
-				console.log("nack requeue type occured");
 				channel.nack(message, false, true);
 			} else if (ackType === AckType.NackDiscard) {
-				console.log("nack discard type occured");
+				channel.nack(message, false, false);
+			}
+		},
+	);
+}
+
+export async function subscribeMsgPack<T>(
+	conn: amqp.ChannelModel,
+	exchange: string,
+	queueName: string,
+	key: string,
+	queueType: SimpleQueueType,
+	handler: (data: T) => Promise<AckType> | AckType,
+): Promise<void> {
+	const [channel, queue] = await declareAndBind(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+	);
+
+	await channel.consume(
+		queue.queue,
+		async (message: amqp.ConsumeMessage | null) => {
+			if (!message) return;
+			const msgContent = decode(message.content) as T;
+			const ackType = await handler(msgContent);
+			if (ackType === AckType.Ack) {
+				channel.ack(message);
+			} else if (ackType === AckType.NackRequeue) {
+				channel.nack(message, false, true);
+			} else if (ackType === AckType.NackDiscard) {
 				channel.nack(message, false, false);
 			}
 		},
@@ -70,3 +101,13 @@ export async function declareAndBind(
 	await channel.bindQueue(queueName, exchange, routingKey);
 	return [channel, queue];
 }
+
+export async function subscribe<T>(
+	conn: amqp.ChannelModel,
+	exchange: string,
+	queueName: string,
+	routingKey: string,
+	simpleQueueType: SimpleQueueType,
+	handler: (data: T) => Promise<AckType> | AckType,
+	deserializer: (data: Buffer) => T,
+): Promise<void> {}

@@ -7,7 +7,11 @@ import {
 	PauseKey,
 } from "../internal/routing/routing.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
-import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
+import {
+	SimpleQueueType,
+	subscribeMsgPack,
+} from "../internal/pubsub/consume.js";
+import { handlerWriteLog } from "./handlers.js";
 
 async function main() {
 	const rabbitConnUrl = "amqp://guest:guest@localhost:5672/";
@@ -22,12 +26,13 @@ async function main() {
 	const channel = await conn.createConfirmChannel();
 
 	// Durable queues survive a server restart
-	await declareAndBind(
+	await subscribeMsgPack(
 		conn,
 		ExchangePerilTopic,
 		GameLogSlug,
 		`${GameLogSlug}.*`,
 		SimpleQueueType.Durable,
+		handlerWriteLog(),
 	);
 
 	printServerHelp();
